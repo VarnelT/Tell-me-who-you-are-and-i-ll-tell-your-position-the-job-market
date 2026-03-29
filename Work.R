@@ -38,12 +38,17 @@ m3 <- lm_robust(logsalhoraire ~ origine + age + age2 + homme + region + tuu_r,
 # Modèle 4 : Modèle complet avec Capital Humain (Blocage du canal éducation)
 m4 <- lm_robust(logsalhoraire ~ origine + age + age2 + homme + region + tuu_r + education, 
                 data = df1)
+# Modèle 5 : Modèle complet avec bad controls
+m5 <- lm_robust(logsalhoraire ~ origine + age + age2 + homme + region + tuu_r + csp_actif + contrat+ education, 
+                data = df1)
+
 # 3. Tableau récapitulatif
 list(
   "Modèle (1)" = m1, 
   "Modèle (2)" = m2, 
   "Modèle (3)" = m3, 
-  "Modèle (4)" = m4
+  "Modèle (4)" = m4,
+  "Modèle (5)" = m5
 ) %>%
   modelsummary(
     stars = TRUE,
