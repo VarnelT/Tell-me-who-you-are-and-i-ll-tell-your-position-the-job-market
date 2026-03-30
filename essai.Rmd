@@ -1,0 +1,62 @@
+---
+title: "DM_Sujet2_TIENTCHEUVARNEL_LANKOANDESHELLA"
+output: html_document
+date: "`r Sys.Date()`"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```
+
+install.packages("haven")
+install.packages("estimatr")
+install.packages("tidyverse")
+install.packages("fastDummies")
+install.packages("corrplot")
+install.packages("rstatix")
+install.packages("modelsummary")
+library(haven) 
+library(rstatix)
+library(estimatr)
+library(tidyverse)
+library(fastDummies)
+library(modelsummary)
+library(corrplot)
+```
+
+# 1. Présentation du projet
+
+Ce projet vise à mesurer l’effet de différentes variables individuelles sur la position sur le marché du travail, en particulier l’impact de l’origine des individus sur le salaire horaire et le chômage.
+
+Les données proviennent d’un panel de 10 000 individus suivis sur 6 trimestres (2014-2016).
+
+Les principales variables sont :
+
+- **Marge intensive** : salaire net horaire (`salhoraire`, `logsalhoraire`)
+- **Marge extensive** : statut sur le marché du travail (actif occupé, chômeur, inactif)
+- **Variables individuelles** : âge, sexe, diplôme, CSP des parents, origine, indicatrices immigré/descendant, état de santé, situation matrimoniale…
+- **Variables géographiques** : région, tranche d’unité urbaine (`tuu_r`), proportions de populations d’origines différentes
+
+L’objectif est de déterminer si l’origine affecte le salaire et l’accès à l’emploi, toutes choses égales par ailleurs.
+
+# 0) Statistiques descriptives générales
+
+Avant de passer à l’analyse économétrique, il est important de s’approprier la base de données et de comprendre les caractéristiques principales des individus suivis.  
+
+La base contient **10 000 individus** observés sur 6 trimestres (2014-2016). On dispose d’informations sur les caractéristiques individuelles (âge, sexe, diplôme, origine, état de santé, situation matrimoniale), les caractéristiques professionnelles (statut sur le marché du travail, salaire, heures travaillées, type de contrat) ainsi que sur l’environnement géographique (région, tranche d’unité urbaine, proportion de populations d’origines différentes).  
+Cette étape est essentielle pour **s’assurer de la qualité des données**, guider le choix des variables explicatives et préparer l’analyse économétrique qui suit.
+# 0.1 Chargement de la base de données
+
+Nous commençons par importer la base de données fournie pour le projet. 
+
+Le code suivant permet de lire le fichier `.dta` et de vérifier ses dimensions (nombre de lignes et de colonnes) :
+
+```
+df <- read_dta("DM_Subject_2_Data.dta")
+dim(df)  
+head(df)
+str(df)
+```
