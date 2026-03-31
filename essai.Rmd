@@ -56,7 +56,7 @@ Le code suivant permet de lire le fichier `.dta` et de vérifier ses dimensions 
 df <- read_dta("DM_Subject_2_Data.dta")
 dim(df)  
 head(df)
-str(df)
+
 ```
 
 ## 0.2 Statistiques Descriptives élémentaires
@@ -246,6 +246,64 @@ regression(logsalhoraire)
 regression(salhoraire)
 ```
 
+## Question 2 : Effet du niveau de diplôme et variables instrumentales
+
+Dans cette question, nous incluons le **niveau de diplôme** comme variable de contrôle pour mieux expliquer les différences de salaire observées. Cette inclusion soulève des questions d’endogénéité et nécessite éventuellement l’utilisation de variables instrumentales.
+
+### a) Problème potentiel et impact sur le coefficient "origine"
+
+Le niveau de diplôme résulte en partie d’un **choix individuel** influencé par des caractéristiques non observées (motivation, capacité cognitive, réseau familial, etc.).\
+Inclure directement `education` dans le modèle peut entraîner :
+
+-   **Biais d’endogénéité** : le coefficient de `education` capte des effets non observables corrélés avec le salaire.
+-   **Biais sur l’estimation de l’effet de l’origine** : si certaines origines ont des distributions d’éducation différentes, le coefficient `origine` pourrait être **sous-estimé ou sur-estimé**, selon la corrélation entre origine et éducation.
+
+### b) Choix des instruments
+
+Pour instrumenter le niveau de diplôme, on peut utiliser des variables exogènes qui influencent l’éducation mais pas directement le salaire. Notre choix s'est porté sur:
+
+-   **La catégorie socio-professionnelle maximale des parents (`csp_max`)** : reflète le capital familial et l’accès aux ressources éducatives.
+
+Cet instrument est **relevant** (corrélés avec le diplôme) et **valide** (non corrélés avec l’erreur du modèle salarial).
+
 ```{r}
+
+
+df1 <- df1 %>%
+  mutate(
+    # Instrument : le parent ayant la plus haute CSP
+    csp_max = pmax(csp_mere, csp_pere, na.rm = TRUE) %>% as.factor()
+  )
+          #--------Pertinence----------
+m_iv <- iv_robust(
+  logsalhoraire ~ origine + age + age2 + homme + region + tuu_r + education | 
+    origine + age + age2 + homme + region + tuu_r + csp_mere,
+  data = df1,
+  diagnostics = TRUE # TRÈS IMPORTANT pour avoir le F-test
+)
+
+summary(m_iv)
+
+
+        #-------Estimation------------
+
+  
+ 
+m_ols <- lm(logsalhoraire ~ origine + age + age2 + homme + region + tuu_r + education,
+            data = df1)
+
+models_iv <- list(
+  "OLS" = m_ols,
+  "IV (2SLS)" = m_iv
+)
+
+modelsummary(
+  models_iv,
+  stars = TRUE,
+  coef_omit = "Intercept",
+  gof_omit = "AIC|BIC|Log.Lik|F|Std.Errors",
+  title = "Comparaison MCO vs Variables Instrumentales",
+  notes = "Instruments : CSP la plus haute des deux parents."
+)
 
 ```
