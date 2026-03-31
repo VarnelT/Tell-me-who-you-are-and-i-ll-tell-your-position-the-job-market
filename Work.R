@@ -73,6 +73,39 @@ regression(logsalhoraire)
 # a) Modèle en niveau 
 regression(salhoraire)
 
+
+#--------------------QUESTION 2------------------------------------------------
+
+df1 <- df1 %>%
+  mutate(
+    # Instrument : le parent ayant la plus haute CSP
+    csp_max = pmax(csp_mere, csp_pere, na.rm = TRUE) %>% as.factor()
+  )
+          #--------Pertinence----------
+m_iv <- iv_robust(
+  logsalhoraire ~ origine + age + age2 + homme + region + tuu_r + education | 
+    origine + age + age2 + homme + region + tuu_r + csp_mere,
+  data = df1,
+  diagnostics = TRUE # TRÈS IMPORTANT pour avoir le F-test
+)
+
+summary(m_iv)
+
+
+        #-------Estimation------------
+models_iv <- list(
+  "Modèle 4" = m4, # Ton modèle précédent
+  "IV (2SLS)" = m_iv
+)
+
+modelsummary(
+  models_iv,
+  stars = TRUE,
+  coef_omit = "Intercept",
+  gof_omit = "AIC|BIC|Log.Lik|F|Std.Errors",
+  title = "Comparaison MCO vs Variables Instrumentales",
+  notes = "Instruments : CSP la plus haute des deux parents."
+)
 #------------------------------------------------------------
 
 boxplot(
