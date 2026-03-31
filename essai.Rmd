@@ -8,9 +8,7 @@ date: "`r Sys.Date()`"
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-
-```
-
+```{r packages, message=FALSE, warning=FALSE}
 install.packages("haven")
 install.packages("estimatr")
 install.packages("tidyverse")
@@ -18,6 +16,7 @@ install.packages("fastDummies")
 install.packages("corrplot")
 install.packages("rstatix")
 install.packages("modelsummary")
+
 library(haven) 
 library(rstatix)
 library(estimatr)
@@ -27,7 +26,7 @@ library(modelsummary)
 library(corrplot)
 ```
 
-# 1. Présentation du projet
+# I. Présentation du projet
 
 Ce projet vise à mesurer l’effet de différentes variables individuelles sur la position sur le marché du travail, en particulier l’impact de l’origine des individus sur le salaire horaire et le chômage.
 
@@ -35,28 +34,218 @@ Les données proviennent d’un panel de 10 000 individus suivis sur 6 trimestre
 
 Les principales variables sont :
 
-- **Marge intensive** : salaire net horaire (`salhoraire`, `logsalhoraire`)
-- **Marge extensive** : statut sur le marché du travail (actif occupé, chômeur, inactif)
-- **Variables individuelles** : âge, sexe, diplôme, CSP des parents, origine, indicatrices immigré/descendant, état de santé, situation matrimoniale…
-- **Variables géographiques** : région, tranche d’unité urbaine (`tuu_r`), proportions de populations d’origines différentes
+-   **Marge intensive** : salaire net horaire (`salhoraire`, `logsalhoraire`)
+-   **Marge extensive** : statut sur le marché du travail (actif occupé, chômeur, inactif)
+-   **Variables individuelles** : âge, sexe, diplôme, CSP des parents, origine, indicatrices immigré/descendant, état de santé, situation matrimoniale…
+-   **Variables géographiques** : région, tranche d’unité urbaine (`tuu_r`), proportions de populations d’origines différentes
 
 L’objectif est de déterminer si l’origine affecte le salaire et l’accès à l’emploi, toutes choses égales par ailleurs.
 
 # 0) Statistiques descriptives générales
 
-Avant de passer à l’analyse économétrique, il est important de s’approprier la base de données et de comprendre les caractéristiques principales des individus suivis.  
+Avant de passer à l’analyse économétrique, il est important de s’approprier la base de données et de comprendre les caractéristiques principales des individus suivis.
 
-La base contient **10 000 individus** observés sur 6 trimestres (2014-2016). On dispose d’informations sur les caractéristiques individuelles (âge, sexe, diplôme, origine, état de santé, situation matrimoniale), les caractéristiques professionnelles (statut sur le marché du travail, salaire, heures travaillées, type de contrat) ainsi que sur l’environnement géographique (région, tranche d’unité urbaine, proportion de populations d’origines différentes).  
-Cette étape est essentielle pour **s’assurer de la qualité des données**, guider le choix des variables explicatives et préparer l’analyse économétrique qui suit.
-# 0.1 Chargement de la base de données
+La base contient **10 000 individus** observés sur 6 trimestres (2014-2016). On dispose d’informations sur les caractéristiques individuelles (âge, sexe, diplôme, origine, état de santé, situation matrimoniale), les caractéristiques professionnelles (statut sur le marché du travail, salaire, heures travaillées, type de contrat) ainsi que sur l’environnement géographique (région, tranche d’unité urbaine, proportion de populations d’origines différentes).\
+Cette étape est essentielle pour **s’assurer de la qualité des données**, guider le choix des variables explicatives et préparer l’analyse économétrique qui suit. \## 0.1 Chargement de la base de données
 
-Nous commençons par importer la base de données fournie pour le projet. 
+Nous commençons par importer la base de données fournie pour le projet.
 
 Le code suivant permet de lire le fichier `.dta` et de vérifier ses dimensions (nombre de lignes et de colonnes) :
 
-```
+```{r}
 df <- read_dta("DM_Subject_2_Data.dta")
 dim(df)  
 head(df)
 str(df)
+```
+
+## 0.2 Statistiques Descriptives élémentaires
+
+------------------------------------------------------------------------
+
+### Distribution de l'âge
+
+```{r}
+
+hist(df$age,
+     col = "lightblue",
+     main = "Distribution de l'âge",
+     xlab = "Âge")
+```
+
+### Distribution du salaire horaire
+
+```{r}
+hist(df$salhoraire,
+     col = "lightgreen",
+     main = "Distribution du salaire horaire",
+     xlab = "Salaire horaire")
+```
+
+## Distribution du log salaire
+
+```{r}
+
+hist(df$logsalhoraire,
+     col = "lightcoral",
+     main = "Distribution du log salaire horaire",
+     xlab = "Log salaire horaire")
+```
+
+### Répartition par origine
+
+```{r}
+
+  table(df$origine)
+
+barplot(table(df$origine),
+        col = "skyblue",
+        main = "Répartition des individus selon l'origine",
+        ylab = "Nombre d'individus")
+```
+
+### Répartition par sexe
+
+```{r}
+
+table(df$homme)
+barplot(table(df$homme),
+        col = c("pink","lightblue"),
+        main = "Répartition par sexe",
+        names.arg = c("Femme","Homme"))
+```
+
+### Salaire selon l'origine
+
+```{r}
+
+boxplot(logsalhoraire ~ origine,
+        data = df,
+        col = "lightblue",
+        main = "Salaire horaire selon l'origine",
+        xlab = "Origine",
+        ylab = "Log salaire horaire")
+        
+```
+
+### Education et origine
+
+```{r}
+
+  table(df$education)
+prop.table(table(df$origine))
+prop.table(table(df$education))
+table_data <- table(df$education, df$origine)
+table(df$education, df$origine)
+table_data <- table(df$education, df$origine)
+
+barplot(table_data,
+        beside = TRUE,
+        col = rainbow(5),
+        legend = TRUE,
+        main = "Distribution du niveau d'éducation selon l'origine")
+```
+
+### Statistiques par groupe (par origine)
+
+```{r}
+df %>%
+  group_by(origine) %>%
+  summarise(
+    salaire_moyen = mean(salhoraire, na.rm = TRUE),
+    logsalaire_moyen = mean(logsalhoraire, na.rm = TRUE),
+    age_moyen = mean(age, na.rm = TRUE),
+    n = n()
+  )
+```
+
+## Interprétation globale des statistiques descriptives
+
+Les statistiques descriptives permettent d’obtenir un premier aperçu des caractéristiques de l’échantillon. L’âge moyen des individus est d’environ 56 ans, avec une médiane proche de cette valeur, ce qui indique une distribution relativement centrée autour des âges actifs. L’échantillon couvre néanmoins une large tranche d’âge, allant de 15 à plus de 100 ans.
+
+Concernant les salaires, le salaire horaire moyen est d’environ 50,9 alors que la médiane est plus faible (45,3), ce qui suggère une distribution asymétrique à droite avec la présence de quelques valeurs très élevées. Cette asymétrie est confirmée par la valeur maximale particulièrement élevée. La transformation logarithmique du salaire permet de réduire cette dispersion et d’obtenir une distribution plus symétrique, ce qui justifie l’utilisation fréquente du log du salaire dans les analyses économétriques.
+
+La distribution des individus selon l’origine montre que la grande majorité de l’échantillon appartient à la catégorie d’origine française, représentant plus de 80 % des observations, tandis que les autres groupes d’origine constituent des parts beaucoup plus faibles de la population observée. La répartition par sexe apparaît relativement équilibrée entre hommes et femmes.
+
+En ce qui concerne le niveau d’éducation, certaines catégories sont plus représentées que d’autres, notamment les niveaux intermédiaires et élevés. La table croisée entre éducation et origine suggère par ailleurs que la distribution du capital humain peut différer selon les groupes d’origine. Enfin, les statistiques par groupe d’origine indiquent que les salaires moyens varient entre ces groupes, certains présentant des niveaux de salaire plus élevés ou plus faibles que la moyenne.
+
+Ces différences observées restent toutefois purement descriptives et ne permettent pas d’interpréter un effet causal de l’origine sur le salaire, car elles ne tiennent pas compte d’autres caractéristiques individuelles susceptibles d’influencer la rémunération, telles que l’âge, le sexe, l’éducation ou la localisation géographique.
+
+Afin d’étudier plus rigoureusement ces écarts, la section suivante propose d’estimer des modèles économétriques du salaire horaire en fonction de l’origine et d’un ensemble de variables de contrôle. L’objectif est d’évaluer si des différences salariales persistent entre groupes d’origine **toutes choses égales par ailleurs**.
+
+# I) Marge intensive (salaire net horaire)
+
+## Question 1 – Effet de l’origine sur le salaire horaire
+
+Dans cette première partie, on s’intéresse à l’existence d’éventuelles inégalités salariales liées à l’origine des individus. Conformément à l’énoncé, on se restreint aux individus **actifs occupés** et on utilise uniquement **le dernier trimestre observé**, ce qui revient à travailler sur une coupe transversale des données.
+
+La variable dépendante considérée est le **salaire net horaire** (`salhoraire`) ou le **logarithme du salaire net horaire** (`logsalhoraire`). L’utilisation du logarithme est courante dans l’analyse des salaires car elle permet de réduire l’asymétrie de la distribution et d’interpréter les coefficients comme des variations relatives.
+
+L’objectif est d’estimer l’effet de la variable **origine** sur le salaire, tout en introduisant progressivement des variables de contrôle afin d’approcher la notion de comparaison **toutes choses égales par ailleurs**. Plusieurs spécifications sont donc estimées :
+
+-   un premier modèle incluant uniquement la variable **origine**, afin d’observer les écarts salariaux bruts entre groupes ;
+-   un second modèle ajoutant des variables démographiques (âge, âge au carré, sexe) permettant de contrôler pour le cycle de vie et les différences entre hommes et femmes ;
+-   un troisième modèle intégrant des variables géographiques (région et type d’unité urbaine) afin de tenir compte des différences territoriales du marché du travail ;
+-   un quatrième modèle incluant le **niveau d’éducation**, variable centrale du capital humain ;
+-   enfin un modèle plus complet intégrant également certaines caractéristiques de l’emploi, telles que la catégorie socio-professionnelle et le type de contrat.
+
+Cette stratégie permet d’analyser comment évoluent les coefficients associés à l’origine lorsque l’on introduit progressivement des variables susceptibles d’expliquer les écarts de salaire observés.
+
+```{r}
+df1 <- df %>%
+  filter(t == 6, acteu == 1)%>%
+  mutate(
+    age2  = age^2
+  ) %>%
+  droplevels()
+
+
+regression <- function(y, data = df1){
+  
+  # On convertit l'argument en caractère si c'est un nom non cité
+  y <- deparse(substitute(y))
+  
+  # Définition des listes de variables explicatives
+  rhs1 <- "origine"
+  rhs2 <- c(rhs1, "age", "age2", "homme")
+  rhs3 <- c(rhs2, "region", "tuu_r")
+  rhs4 <- c(rhs3, "education")
+  rhs5 <- c(rhs4, "csp_actif", "contrat")
+  
+  # Estimation des modèles avec reformulate()
+  m1 <- lm_robust(reformulate(rhs1, y), data = data)
+  m2 <- lm_robust(reformulate(rhs2, y), data = data)
+  m3 <- lm_robust(reformulate(rhs3, y), data = data)
+  m4 <- lm_robust(reformulate(rhs4, y), data = data)
+  m5 <- lm_robust(reformulate(rhs5, y), data = data)
+  
+  # On regroupe pour le tableau
+  models <- list(
+    "modèle(1)" = m1, 
+    "modèle(2)" = m2, 
+    "modèle(3)" = m3, 
+    "modèle(4)" = m4, 
+    "modèle(5)" = m5
+  )
+  
+  # Rendu du tableau
+  modelsummary(
+    models,
+    stars = TRUE,
+    coef_omit = "Intercept",
+    gof_omit = "AIC|BIC|Log.Lik|F|Std.Errors",
+    title = paste("Analyse de la variable :", y),
+    notes = "Écarts-types robustes (HC2)."
+  )
+  
+}
+
+  # a) Modèle LOG 
+regression(logsalhoraire)
+# a) Modèle en niveau 
+regression(salhoraire)
+```
+
+```{r}
+
 ```
