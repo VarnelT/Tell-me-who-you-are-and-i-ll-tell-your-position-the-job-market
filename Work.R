@@ -6,8 +6,10 @@ install.packages("fastDummies")
 install.packages("corrplot")
 install.packages("rstatix")
 install.packages("modelsummary")
+install.packages("plm")
 #-------------------------------------------------------------
 library(haven) 
+library(plm)
 library(rstatix)
 library(estimatr)
 library(tidyverse)
@@ -106,8 +108,30 @@ modelsummary(
   title = "Comparaison MCO vs Variables Instrumentales",
   notes = "Instruments : CSP la plus haute des deux parents."
 )
-#------------------------------------------------------------
+#----------------------Question 3--------------------------------------
 
+      #---a) Modèle avec exogénéité des résidus et des effets fixes individuels---
+df_panel <- df %>%
+  filter(t %in% c(1, 6), acteu == 1) %>%
+  mutate(age2 = age^2) %>%
+  group_by(id_individu) %>%
+  filter(n() == 2) %>%
+  ungroup()
+
+      #Estimation MCO Empilé (Pooled OLS)
+
+m3a <- plm(
+  logsalhoraire ~ origine + age + age2 + homme + region + tuu_r + education,
+  data = df_panel,
+  model = "pooling"
+)
+
+# Affichage avec écarts-types robustes (Clustered par individu)
+# TRÈS IMPORTANT en panel 
+summary(m3a, vcov = vcovHC(m3a, type = "HC1", cluster = "group"))
+
+
+#-----------------------------------------------------------------------------
 boxplot(
   logsalhoraire ~ origine,
   data = df,

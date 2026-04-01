@@ -1,0 +1,204 @@
+---
+title: "Tell me who you are and i'll tell your postion on the job market"
+author: "Varnel TIENTCHEU & Shella LANKOANDE"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: show
+    code-tools: true
+    theme: cosmo
+    fig-width: 10
+    fig-height: 6
+    embed-resources: true
+  pdf:
+    toc: true
+    number-sections: true
+    geometry: margin=1in
+---
+
+```{r packages, message=FALSE, warning=FALSE}
+# Installation des packages
+install.packages("haven")
+install.packages("estimatr")
+install.packages("tidyverse")
+install.packages("fastDummies")
+install.packages("corrplot")
+install.packages("rstatix")
+install.packages("modelsummary")
+install.packages("plm")
+install.packages("ggdag")
+#-------------------------------------------------------------
+library(haven) 
+library(plm)
+library(rstatix)
+library(estimatr)
+library(tidyverse)
+library(fastDummies)
+library(modelsummary)
+library(corrplot)
+```
+
+# I. Présentation du projet
+
+Ce projet vise à mesurer l’effet de différentes variables individuelles sur la position sur le marché du travail, en particulier l’impact de l’origine des individus sur le salaire horaire et le chômage.
+
+Les données proviennent d’un panel de 10 000 individus suivis sur 6 trimestres (2014-2016).
+
+Les principales variables sont :
+
+-   **Marge intensive** : salaire net horaire (`salhoraire`, `logsalhoraire`)
+-   **Marge extensive** : statut sur le marché du travail (actif occupé, chômeur, inactif)
+-   **Variables individuelles** : âge, sexe, diplôme, CSP des parents, origine, indicatrices immigré/descendant, état de santé, situation matrimoniale…
+-   **Variables géographiques** : région, tranche d’unité urbaine , proportions de populations d’origines différentes...
+
+L’objectif est de déterminer si l’origine affecte le salaire et l’accès à l’emploi, toutes choses égales par ailleurs.
+
+Avant de passer à l’analyse économétrique, il est important de s’approprier la base de données et de comprendre les caractéristiques principales des individus suivis.
+
+La base contient **10 000 individus** observés sur 6 trimestres (2014-2016). On dispose d’informations sur les caractéristiques individuelles (âge, sexe, diplôme, origine, état de santé, situation matrimoniale), les caractéristiques professionnelles (statut sur le marché du travail, salaire, heures travaillées, type de contrat) ainsi que sur l’environnement géographique (région, tranche d’unité urbaine, proportion de populations d’origines différentes).\
+Cette étape est essentielle pour **s’assurer de la qualité des données**, guider le choix des variables explicatives et préparer l’analyse économétrique qui suit.
+
+### 1) Chargement de la base de données
+
+Nous commençons par importer la base de données fournie pour le projet.
+
+Le code suivant permet de lire le fichier `.dta` et de vérifier ses dimensions (nombre de lignes et de colonnes) :
+
+```{r, echo=TRUE}
+df <- read_dta("DM_Subject_2_Data.dta")
+dim(df)  
+
+```
+
+### 2) Statistiques descriptives 
+
+```{r, echo = FALSE}
+# On construit le graphique avec le vrai label des modalités
+df$origine_label <- factor(df$origine,
+  levels = c("01","03","04","05","06","07","08","09","10","99"),
+  labels = c(
+    "France",
+    "Europe du Nord",
+    "Europe du Sud",
+    "Europe de l'Est",
+    "Maghreb",
+    "Reste de l'Afrique",
+    "Proche-Orient",
+    "Asie du Sud-Est",
+    "Reste du monde",
+    "Non renseigné"
+  )
+)
+
+df$acteu_label <- factor(df$acteu,
+  levels = c("1","2","3"),
+  labels = c("En emploi", "Chômage", "Inactif")
+)
+
+df$education_label <- factor(df$education,
+  levels = c("1","3","4","5","6","7"),
+  labels = c(
+    "Supérieur > Bac+2",
+    "Bac+2",
+    "Bac",
+    "CAP/BEP",
+    "Brevet",
+    "Sans diplôme"
+  )
+)
+
+
+```
+
+```{r, echo=FALSE}
+
+par(mfrow = c(1,2), mar = c(6,4,3,1), cex.axis = 0.8)
+
+# 1. Origine
+barplot(
+  prop.table(table(df$origine_label)),
+  col = "steelblue",
+  las = 2,
+  main = "Répartition par origine"
+)
+
+# 2. Salaire (log)
+boxplot(
+  logsalhoraire ~ origine_label,
+  data = df,
+  col = "lightgray",
+  las = 2,
+  main = "Salaire (log) par origine",
+  outline = FALSE
+)
+
+# 3. Statut emploi
+tab <- prop.table(table(df$origine_label, df$acteu_label), 1)
+
+barplot(
+  t(tab),
+  col = c("darkgreen", "orange", "red"),
+  legend = TRUE,
+  las = 2,
+  main = "Statut d'emploi par origine"
+)
+
+# 4. Education
+tab_ed <- prop.table(table(df$origine_label, df$education_label), 1)
+
+barplot(
+  t(tab_ed),
+  col = rainbow(6),
+  legend = TRUE,
+  las = 2,
+  main = "Éducation par origine"
+)
+
+par(mfrow = c(1,1))
+```
+
+L'échantillon est massivement dominé par l'origine française (plus de 80 %). On observe une hétérogénéité marquée du capital humain : les populations originaires du Maghreb et Asie du Sud-Est présentent une part importante de non-diplômés, tandis que les origines d'Europe du Nord ou du Reste du monde affichent des taux de diplômes supérieurs élevés. Cette stratification éducative initiale confirme que le diplôme est un canal de transmission majeur des inégalités salariales qu'il faudra isoler.
+
+Sur le marché du travail, les disparités sont visibles dès l'accès à l'emploi (marge extensive) : les origines africaines et maghrébines affichent des parts de chômage plus prononcées que la moyenne. Côté salaires (marge intensive), si les médianes des logs-salaires semblent globalement alignées, on distingue un tassement vers le bas pour le Reste de l'Afrique et l'Asie du Sud-Est. La forte dispersion dans tous les groupes, couplée à ces différences de médianes malgré des profils éducatifs parfois élevés, justifie la problématique de recherche d'un effet direct de l'origine au-delà des seules caractéristiques productives.
+
+# II. Marge Intensive
+
+Dans un premier temps, on étudie le salaire des actifs occupés et on s’intéresse à l’existence de potentielles inégalités salariales dues à l’origine. Le salaire n’est disponible qu’au premier et au dernier trimestre : données de panel avec T = 2 pour cette variable.
+
+#### Question 1 – Effet de l’origine sur le salaire horaire
+
+Dans cette première partie, on s’intéresse à l’existence d’éventuelles inégalités salariales liées à l’origine des individus. Conformément à l’énoncé, on se restreint aux individus **actifs occupés** et on utilise uniquement **le dernier trimestre observé**, ce qui revient à travailler sur une coupe transversale des données.
+
+##### a) Modèle et choix de variables
+
+On va entraîner les deux modèles, mais de façon progressive en ajoutant des nouvelles variables au fur et à mesure, et voir comment les coefficients évoluent. Afin d'identifier un effet causal, il est nécessaire de:
+
+1.  Inclure tous les **cofounders** (variables correlées à la fois à l'origine et au salaire);
+
+2.  Inclure toutes les variables correlées uniquement au salaire;
+
+3.  Ne pas inclure les variables à mi-chemin entre **Origine** et **salaire**.
+
+Ceci nous conduit donc à retenir:
+
+-   L'Origine: c'est le coeur de l'étude; la variable dont on cherche l'effet sur le salaire;
+
+-   L'âge et \$\$l'âge\^2\$\$: c'est un proxy de l'ancienneté.On l'inclut comme proxy de l'expérience professionnelle;
+
+-   Le sexe: pour capter les inégalités de salaire pourvant exister entre hommes et femmes;
+
+-   La région et la tranche d'unité urbaine: pour contrôler les spécificités du marché du travail local, et neutraliser l'effet de concentration des immigrés dans certaines villes où les salaires sont élevés;
+
+-   L'éducation: car le niveau de diplôme influence fortement le salaire, et ne pas l'inclure produirait un biais.
+
+Dans la même logique, on choisit de ne pas contrôler les variables comme la Catégorie socioprofessionnelle (CSP), et le type de contrat. En effet, si jamais il y'a de la discrimination à l'embauche du fait de l'origine, contrôler par ces variables reviendrait à neutraliser une partie de l'effet de l'origine sur le salaire.
+
+Par ailleurs, il est tout à fait possible que l'éducation soit un canal par lequel l'origine influence le salaire; mais pour l'instant on choisit d'ignorer cela car ce sera abordé dans les questions suivantes.
+
+Le DAG (Directed Acyclic Graph) suivant résume notre schéma de modélisation:
+
+![](images/clipboard-2917733682.png)
+
+##### b) Interprétation
