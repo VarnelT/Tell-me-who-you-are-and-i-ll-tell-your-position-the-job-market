@@ -1,5 +1,5 @@
 ---
-title: "Tell me who you are and i'll tell your postion on the job market"
+title: "Tell me who you are and i'll tell your position on the job market"
 author: "Varnel TIENTCHEU & Shella LANKOANDE"
 date: today
 format:
@@ -264,8 +264,66 @@ regression(logsalhoraire)
 regression(salhoraire)
 ```
 
-Toutes choses égales par ailleurs, le **modèle 1** prédit qu’un individu originaire d'Afrique gagne en moyenne **8,40 \$/h de moins** qu’un Français (soit une pénalité de **17,8 %** selon la spécification en log). Ce résultat est statistiquement significatif au seuil de **1 %**. L'ajout des variables de contrôle (âge, sexe et zone géographique) affine l'estimation, mais le signe, l'ampleur et la significativité de l'effet demeurent **robustes**.
+Toutes choses égales par ailleurs, le modèle 1 prédit qu’un individu originaire d'Afrique gagne en moyenne **8,40 \$/h de moins** qu’un Français (soit une pénalité de **17,8 %** selon la spécification en log). Ce résultat est statistiquement significatif au seuil de **1 %**. L'ajout des variables de contrôle (âge, sexe et zone géographique) affine l'estimation, mais le signe, l'ampleur et la significativité de l'effet demeurent **robustes**.
 
 En contrôlant en plus par l'**éducation** (modèle 4), l'écart se réduit légèrement mais reste massif : un individu originaire d'Afrique gagne désormais, toutes choses égales par ailleurs, **7,71 \$/h de moins** qu'un Français (soit **15 %** en moins dans le modèle en log). La persistance de cet effet, même à diplôme identique, suggère qu'une part prépondérante de l'inégalité salariale est directe et ne s'explique pas uniquement par des différences de capital humain. L’ajout de **éducation** provoque en plus une hausse substantielle du $R^2$ (passant de **8,3%** à **25,1%**). Cette progression démontre que le capital humain est le principal facteur explicatif de la variance des salaires dans notre échantillon.
 
-Enfin, le **modèle 5** intègre la CSP et le type de contrat.
+Enfin, le modèle 5 intègre la CSP et le type de contrat. L’effet de l’origine devient beaucoup plus fragile. Le coefficient n’est plus significatif dans le modèle en niveau et ne l’est qu'au seuil de **10 %** dans le modèle en log. Ce résultat suggère qu’à CSP et type de contrat identiques, l’écart de salaire horaire tend à s’estomper statistiquement. En d'autres termes, l’essentiel du désavantage lié à l’origine constaté dans les modèles précédents semble transiter par une **ségrégation professionnelle** (accès plus difficile aux postes qualifiés et aux contrats stables) plutôt que par une inégalité de rémunération directe au sein d’un même poste.
+
+#### **c) Canaux de transmission de l'effet de l'origine sur le salaire**
+
+Les régressions précédentes met en évidence une pénalité de 17,8% pour les individus d'origine africaine par rapport aux français (modèle 1). L'introduction du niveau d'éducation (modèle 4), ne réduit cet écart qu'à 15,5%; ce qui suggère que la disparité salariale ne résulte pas principalement d'une différence de capital humain. L'éducation, bien que élément important du salaire, n'explique qu'une faible part de l'inégalité liée à l'origine.
+
+En ajoutant la CSP et le type de contrat (modèle 5), on observe un effondrement de l'amplitude des coefficients de l'éducation, et une chute de la pénalité à 6,7%. Cela prouve qu'une grande partie du rendement de l'éducation transite par le canal de **l'insertion professionnelle**. La CSP et le contrat absorbent donc une partie de l'effet de l'éducation (et de l'origine).
+
+Finalement, ces résultats révèlent 02 possibles formes de discrimination. D'une part, **une discrimination à l'embauche (prépondérante):** l'origine impacterait l'obtention de statuts particuliers (cadres) ou de contrats stables (CDI). D'autre part, **une discrimination à la rémunération (pure)**, qui subsiste même à poste et contrat identiques.
+
+#### Question 2 – Inclure le niveau de diplôme comme variable de contrôle
+
+#### **a) Problème qui peut survenir en contrôlant par le niveau de diplôme**
+
+Dans cette partie, on s'intéresse à l'effet de l'origine sur le salaire. Si la réalité est telle que l'origine influence le salaire à travers le niveau d'éducation, alors en contrôlant par l'éducation, on commet un **biais de variable incluse** puisqu'on bloque un chemin causal. Par conséquent, le coefficient de Origine est biaisé vers le bas, et ne mesure que l'effet "**à niveau d'éducation égal**".
+
+De plus, l'éducation est certainement endogène ici, car il n'est certainement pas choisi au hasard par les individus (actifs occupés) de notre échantillon. Il est donc correlé aux facteurs inobservés.
+
+#### **b) Variables disponibles pour instrumenter l'éducation**
+
+Comme instruments, on peut utiliser: la catégorie socio-professionnelle des parents.
+
+-   Pertinence: La CSP des parents devrait être correlée au niveau d'éducation de l'enfant, notamment en raison de l'héritage culturel et/ou la reproduction sociale. Un enfant ayant des parents qui sont professeurs d'université par exemple, aura tendance à poursuivre ses études jusqu'au master au moins (ou Doctorat), contrairement à un enfant d'ouvriers.
+
+-   Exogénéité: Elle repose sur une hypothèse qui est discutable: l*a profession des parents n'influence le salaire de l'enfant que par le niveau diplôme*. En pratique, les enfants peuvent très biens bénéficier des "connexions" ou du "réseau" de leurs parents pour décrocher des emplois bien rémunérés.
+
+    ```{r}
+    #--------------------QUESTION 2-----------------------------
+
+              #--------Pertinence----------
+    m_iv <- iv_robust(
+      logsalhoraire ~ origine + age + age2 + homme + region + tuu_r + education | 
+        origine + age + age2 + homme + region + tuu_r + csp_mere,
+      data = df1,
+      diagnostics = TRUE # TRÈS IMPORTANT pour avoir le F-test
+    )
+
+    summary(m_iv)
+
+
+            #-------Estimation------------
+    models_iv <- list(
+      "Modèle 4" = m4, # le modèle précédent
+      "IV (2SLS)" = m_iv
+    )
+
+    modelsummary(
+      models_iv,
+      stars = TRUE,
+      coef_omit = "Intercept",
+      gof_omit = "AIC|BIC|Log.Lik|F|Std.Errors",
+      title = "Comparaison MCO vs Variables Instrumentales",
+      notes = "Instruments : CSP de la mere."
+    )
+    ```
+
+Les tests de diagnostic indiquent que nos instruments (CSP de la mère) sont globalement **pertinents**. Pour la plupart des niveaux d'éducation, la statistique F est proche ou supérieure à **10**, ce qui correspond à la règle empirique usuelle pour écarter le risque d'instruments faibles. On note toutefois une faiblesse relative pour le niveau `education6` ($F = 5,55$). Néanmoins, les p-valeurs extrêmement faibles ($< 2e-16$) sur l'ensemble des modalités confirment que la CSP des parents reste un prédicteur significatif du parcours scolaire, permettant ainsi une identification du modèle.
+
+De plus, le test de sargan confirme (au seuil de 10%), que
