@@ -167,7 +167,7 @@ Sur le marché du travail, les disparités sont visibles dès l'accès à l'empl
 
 Dans un premier temps, on étudie le salaire des actifs occupés et on s’intéresse à l’existence de potentielles inégalités salariales dues à l’origine. Le salaire n’est disponible qu’au premier et au dernier trimestre : données de panel avec T = 2 pour cette variable.
 
-#### Question 1 – Effet de l’origine sur le salaire horaire
+### Question 1 – Effet de l’origine sur le salaire horaire
 
 Dans cette première partie, on s’intéresse à l’existence d’éventuelles inégalités salariales liées à l’origine des individus. Conformément à l’énoncé, on se restreint aux individus **actifs occupés** et on utilise uniquement **le dernier trimestre observé**, ce qui revient à travailler sur une coupe transversale des données.
 
@@ -278,7 +278,7 @@ En ajoutant la CSP et le type de contrat (modèle 5), on observe un effondrement
 
 Finalement, ces résultats révèlent 02 possibles formes de discrimination. D'une part, **une discrimination à l'embauche (prépondérante):** l'origine impacterait l'obtention de statuts particuliers (cadres) ou de contrats stables (CDI). D'autre part, **une discrimination à la rémunération (pure)**, qui subsiste même à poste et contrat identiques.
 
-#### Question 2 – Inclure le niveau de diplôme comme variable de contrôle
+### Question 2 – Inclure le niveau de diplôme comme variable de contrôle
 
 #### **a) Problème qui peut survenir en contrôlant par le niveau de diplôme**
 
@@ -307,23 +307,72 @@ Comme instruments, on peut utiliser: la catégorie socio-professionnelle des par
 
     summary(m_iv)
 
-
-            #-------Estimation------------
-    models_iv <- list(
-      "Modèle 4" = m4, # le modèle précédent
-      "IV (2SLS)" = m_iv
-    )
-
-    modelsummary(
-      models_iv,
-      stars = TRUE,
-      coef_omit = "Intercept",
-      gof_omit = "AIC|BIC|Log.Lik|F|Std.Errors",
-      title = "Comparaison MCO vs Variables Instrumentales",
-      notes = "Instruments : CSP de la mere."
-    )
     ```
 
 Les tests de diagnostic indiquent que nos instruments (CSP de la mère) sont globalement **pertinents**. Pour la plupart des niveaux d'éducation, la statistique F est proche ou supérieure à **10**, ce qui correspond à la règle empirique usuelle pour écarter le risque d'instruments faibles. On note toutefois une faiblesse relative pour le niveau `education6` ($F = 5,55$). Néanmoins, les p-valeurs extrêmement faibles ($< 2e-16$) sur l'ensemble des modalités confirment que la CSP des parents reste un prédicteur significatif du parcours scolaire, permettant ainsi une identification du modèle.
 
-De plus, le test de sargan confirme (au seuil de 10%), que
+De plus, le test de sargan confirme (au seuil de 10%), que la CSP des parents n'impacte le salaire qu'à travers le niveau d'education de l'enfant. Le test de Wu-Hausmann suggère que l'estimateur MCO n'était pas nécessairement biaisé de mainère significative par des variables omises. Dans ce cas, l'approche IV sert principalement de **test de robustesse.**
+
+#### **b) Interprétation des résultats**
+
+```{r}
+        #-------Estimation------------
+models_iv <- list(
+  "Modèle 4" = m4, # le modèle précédent
+  "IV (2SLS)" = m_iv
+)
+
+modelsummary(
+  models_iv,
+  stars = TRUE,
+  coef_omit = "Intercept",
+  gof_omit = "AIC|BIC|Log.Lik|F|Std.Errors",
+  title = "Comparaison MCO vs Variables Instrumentales",
+  notes = "Instruments : CSP de la mere."
+)
+```
+
+Le passage du MCO à l'IV montre une **grande stabilité des coefficients**. D'un point de vue quantitatif, à caractéristiques égales, un africain a un salaire horaire inférieur de 14,4% à celui d'un français.. Ce résultat étant significatif au seuil de 5%.
+
+Ces résultats confirment que l'origine a un effet direct sur la rémunération, indépendant du parcours scolaire. Enfin, notons que l'IV et les MCO produisent des résultats très similaires (voir coef. Origine), comme le suggérait le test de Wu-Hausman.
+
+### Question 2 – On reconsidère la structure de panel
+
+On considère les observations au premier et au dernier trimestre pour les individus actifs occupés.
+
+#### **a) Regression Pooled**
+
+Si l'on suppose l'exogénéité des résidus et effets fixes individuels, alors le modèle approprié est une "pooled OLS". Dans ce cadre, le coefficient $\beta$ de la régression est convergent et sans biais.
+
+```{r}
+ #---a) Modèle avec exogénéité des résidus et des effets fixes individuels---
+df_panel <- df %>%
+  filter(t %in% c(1, 6), acteu == 1) %>%
+  mutate(age2 = age^2) %>%
+  group_by(id_individu) %>%
+  filter(n() == 2) %>%
+  ungroup()
+
+      #Estimation MCO Empilé (Pooled OLS)
+
+m3a <- plm(
+  logsalhoraire ~ origine + age + age2 + homme + region + tuu_r + education,
+  data = df_panel,
+  model = "pooling"
+)
+
+# Ecarts-types robustes (Clustered par individu)
+summary(m3a, vcov = vcovHC(m3a, type = "HC1", cluster = "group"))
+```
+
+Le modèle **Pooled OLS** confirme la persistance d'une pénalité salariale de **15,38 %** pour les africains, résultat hautement significatif ($p < 0,01$) et cohérent avec les analyses en coupe transversale précédentes.
+
+#### **b) Inclure l'origine ? Endogénéité ?**
+
+L'origine est une caractéristique propre d'un individu; il est donc de fait un effet fixe. Ainsi, on peut très bien l'inclure dans la régression pooled de la question 3a.
+
+Cependant, le passage au panel "empilé" ne résout pas l'**endogénéité**. En effet, le Pooled OLS hérite des mêmes limites que le MCO classique : il suppose que le "talent" inobservé n'est pas corrélé à l'origine ou au diplôme. La persistance du coefficient de $-0,1538$ indique donc que, tant qu'on ne neutralise pas les effets fixes individuels le diagnostic reste identique : une part majeure de l'inégalité de l'origine résiste au contrôle par le capital humain, sans que l'on puisse encore affirmer s'il s'agit de pure discrimination ou d'un biais de variables omises persistant.
+
+#### **b) On ne suppose plus l'exogénéité stricte. Peut-on étudier l'effet de la variable Origine ?**
+
+Si l'on autorise les effets individuels à être corrélés avec les régresseurs, alors deux méthodes s'offrent à nous: *le Within et le First-Difference*; ces méthodes visant à supprimer les effets fixes. L'origine étant un effet fixe, il est impossible dans ce cadre d'étudier l'effet de la variable "origine" sur le salaire.
