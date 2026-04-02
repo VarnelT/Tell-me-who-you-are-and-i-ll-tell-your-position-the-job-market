@@ -374,6 +374,6 @@ L'origine est une caractéristique propre d'un individu; il est donc de fait un 
 
 Cependant, le passage au panel "empilé" ne résout pas l'**endogénéité**. En effet, le Pooled OLS hérite des mêmes limites que le MCO classique : il suppose que le "talent" inobservé n'est pas corrélé à l'origine ou au diplôme. La persistance du coefficient de $-0,1538$ indique donc que, tant qu'on ne neutralise pas les effets fixes individuels le diagnostic reste identique : une part majeure de l'inégalité de l'origine résiste au contrôle par le capital humain, sans que l'on puisse encore affirmer s'il s'agit de pure discrimination ou d'un biais de variables omises persistant.
 
-#### **b) On ne suppose plus l'exogénéité stricte. Peut-on étudier l'effet de la variable Origine ?**
+#### **c) On ne suppose plus l'exogénéité stricte. Peut-on étudier l'effet de la variable Origine ?**
 
 Si l'on autorise les effets individuels à être corrélés avec les régresseurs, alors deux méthodes s'offrent à nous: *le Within et le First-Difference*; ces méthodes visant à supprimer les effets fixes. L'origine étant un effet fixe, il est impossible dans ce cadre d'étudier l'effet de la variable "origine" sur le salaire.
