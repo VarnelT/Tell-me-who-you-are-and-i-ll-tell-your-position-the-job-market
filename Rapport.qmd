@@ -317,8 +317,9 @@ De plus, le test de sargan confirme (au seuil de 10%), que la CSP des parents n'
 
 ```{r}
         #-------Estimation------------
+m_ols <- lm(logsalhoraire ~ origine + age + age2 + homme + region + tuu_r + education, data = df1)
 models_iv <- list(
-  "Modèle 4" = m4, # le modèle précédent
+  "Modèle 4" = m_ols, # le modèle précédent
   "IV (2SLS)" = m_iv
 )
 
@@ -336,7 +337,7 @@ Le passage du MCO à l'IV montre une **grande stabilité des coefficients**. D'u
 
 Ces résultats confirment que l'origine a un effet direct sur la rémunération, indépendant du parcours scolaire. Enfin, notons que l'IV et les MCO produisent des résultats très similaires (voir coef. Origine), comme le suggérait le test de Wu-Hausman.
 
-### Question 2 – On reconsidère la structure de panel
+### Question 3 – On reconsidère la structure de panel
 
 On considère les observations au premier et au dernier trimestre pour les individus actifs occupés.
 
