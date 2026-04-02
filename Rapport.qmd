@@ -72,7 +72,7 @@ dim(df)
 
 ```
 
-### 2) Statistiques descriptives 
+### 2) Statistiques descriptives
 
 ```{r, echo = FALSE}
 # On construit le graphique avec le vrai label des modalités
@@ -171,29 +171,29 @@ Dans un premier temps, on étudie le salaire des actifs occupés et on s’inté
 
 Dans cette première partie, on s’intéresse à l’existence d’éventuelles inégalités salariales liées à l’origine des individus. Conformément à l’énoncé, on se restreint aux individus **actifs occupés** et on utilise uniquement **le dernier trimestre observé**, ce qui revient à travailler sur une coupe transversale des données.
 
-##### a) Modèle et choix de variables
+#### **a) Modèle et choix de variables**
 
-On va entraîner les deux modèles, mais de façon progressive en ajoutant des nouvelles variables au fur et à mesure, et voir comment les coefficients évoluent. Afin d'identifier un effet causal, il est nécessaire de:
+Afin d'identifier un effet causal, il est nécessaire de:
 
 1.  Inclure tous les **cofounders** (variables correlées à la fois à l'origine et au salaire);
 
 2.  Inclure toutes les variables correlées uniquement au salaire;
 
-3.  Ne pas inclure les variables à mi-chemin entre **Origine** et **salaire**.
+3.  Ne pas inclure les variables à mi-chemin entre **Origine** et **salaire** pour éviter un biais de variable incluse.
 
 Ceci nous conduit donc à retenir:
 
--   L'Origine: c'est le coeur de l'étude; la variable dont on cherche l'effet sur le salaire;
+-   **L'Origine**: c'est le coeur de l'étude; la variable dont on cherche l'effet sur le salaire;
 
--   L'âge et \$\$l'âge\^2\$\$: c'est un proxy de l'ancienneté.On l'inclut comme proxy de l'expérience professionnelle;
+-   **L'âge** et \$**l'âge\^2**\$: c'est un proxy de l'ancienneté.On l'inclut comme proxy de l'expérience professionnelle;
 
--   Le sexe: pour capter les inégalités de salaire pourvant exister entre hommes et femmes;
+-   **Le sexe**: pour capter les inégalités de salaire pourvant exister entre hommes et femmes;
 
--   La région et la tranche d'unité urbaine: pour contrôler les spécificités du marché du travail local, et neutraliser l'effet de concentration des immigrés dans certaines villes où les salaires sont élevés;
+-   **La région** et la **tranche d'unité urbaine**: pour contrôler les spécificités du marché du travail local, et neutraliser l'effet de concentration des immigrés dans certaines villes où les salaires sont élevés;
 
--   L'éducation: car le niveau de diplôme influence fortement le salaire, et ne pas l'inclure produirait un biais.
+-   **L'éducation**: car le niveau de diplôme influence fortement le salaire, et ne pas l'inclure produirait un biais.
 
-Dans la même logique, on choisit de ne pas contrôler les variables comme la Catégorie socioprofessionnelle (CSP), et le type de contrat. En effet, si jamais il y'a de la discrimination à l'embauche du fait de l'origine, contrôler par ces variables reviendrait à neutraliser une partie de l'effet de l'origine sur le salaire.
+Dans la même logique, on choisit de ne pas contrôler les variables comme la catégorie socioprofessionnelle (CSP), et le type de contrat. En effet, si jamais il y'a de la discrimination à l'embauche du fait de l'origine, contrôler par ces variables reviendrait à neutraliser une partie de l'effet de l'origine sur le salaire.
 
 Par ailleurs, il est tout à fait possible que l'éducation soit un canal par lequel l'origine influence le salaire; mais pour l'instant on choisit d'ignorer cela car ce sera abordé dans les questions suivantes.
 
@@ -201,4 +201,71 @@ Le DAG (Directed Acyclic Graph) suivant résume notre schéma de modélisation:
 
 ![](images/clipboard-2917733682.png)
 
-##### b) Interprétation
+#### **b) Interprétation**
+
+Tous les modèles estimés ne peuvent s'interpréter qu'en termes de prédiction et non de causalité. En effet, l'hypothèse d'abscence de biais de sélection est très peu crédible; bien qu'on ait contrôlé par certaines variables pertinentes.
+
+Les interprétations suivantes, se feront (pour des besoins de simplicité) uniquement sur les personnes originaires d'afrique.
+
+On va entraîner les deux modèles, mais de façon progressive en ajoutant des nouvelles variables au fur et à mesure, et voir comment les coefficients évoluent.
+
+```{r}
+#--------------------QUESTION 1--------------------------------
+df1 <- df %>%
+  filter(t == 6, acteu == 1)%>%
+  mutate(
+    age2  = age^2
+  ) %>%
+  droplevels()
+
+
+regression <- function(y, data = df1){
+  
+  # On convertit l'argument en caractère 
+  y <- deparse(substitute(y))
+  
+  # Définition des listes de variables explicatives
+  rhs1 <- "origine"
+  rhs2 <- c(rhs1, "age", "age2", "homme")
+  rhs3 <- c(rhs2, "region", "tuu_r")
+  rhs4 <- c(rhs3, "education")
+  rhs5 <- c(rhs4, "csp_actif", "contrat")
+  
+  # Estimation des modèles
+  m1 <- lm_robust(reformulate(rhs1, y), data = data)
+  m2 <- lm_robust(reformulate(rhs2, y), data = data)
+  m3 <- lm_robust(reformulate(rhs3, y), data = data)
+  m4 <- lm_robust(reformulate(rhs4, y), data = data)
+  m5 <- lm_robust(reformulate(rhs5, y), data = data)
+  
+  # On regroupe pour le tableau
+  models <- list(
+    "modèle(1)" = m1, 
+    "modèle(2)" = m2, 
+    "modèle(3)" = m3, 
+    "modèle(4)" = m4, 
+    "modèle(5)" = m5
+  )
+  
+  # Rendu du tableau
+  modelsummary(
+    models,
+    stars = TRUE,
+    coef_omit = "Intercept",
+    gof_omit = "AIC|BIC|Log.Lik|F|Std.Errors",
+    title = paste("Analyse de la variable :", y),
+    notes = "Écarts-types robustes (HC2)."
+  )
+  
+}
+  # a) Modèle LOG 
+regression(logsalhoraire)
+# a) Modèle en niveau 
+regression(salhoraire)
+```
+
+Toutes choses égales par ailleurs, le **modèle 1** prédit qu’un individu originaire d'Afrique gagne en moyenne **8,40 \$/h de moins** qu’un Français (soit une pénalité de **17,8 %** selon la spécification en log). Ce résultat est statistiquement significatif au seuil de **1 %**. L'ajout des variables de contrôle (âge, sexe et zone géographique) affine l'estimation, mais le signe, l'ampleur et la significativité de l'effet demeurent **robustes**.
+
+En contrôlant en plus par l'**éducation** (modèle 4), l'écart se réduit légèrement mais reste massif : un individu originaire d'Afrique gagne désormais, toutes choses égales par ailleurs, **7,71 \$/h de moins** qu'un Français (soit **15 %** en moins dans le modèle en log). La persistance de cet effet, même à diplôme identique, suggère qu'une part prépondérante de l'inégalité salariale est directe et ne s'explique pas uniquement par des différences de capital humain. L’ajout de **éducation** provoque en plus une hausse substantielle du $R^2$ (passant de **8,3%** à **25,1%**). Cette progression démontre que le capital humain est le principal facteur explicatif de la variance des salaires dans notre échantillon.
+
+Enfin, le **modèle 5** intègre la CSP et le type de contrat.
