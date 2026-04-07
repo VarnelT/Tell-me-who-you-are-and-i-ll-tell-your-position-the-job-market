@@ -151,3 +151,93 @@ barplot(
   legend = TRUE,
   main = "Interaction entre deux variables qualitatives"
 )
+#------------------------------------------------------------------------------
+# ------------------------------------------------------------
+# Question 4 – Modèle de probabilité linéaire en panel
+# ------------------------------------------------------------
+
+# Dans cette partie, on s’intéresse à la marge extensive du marché du travail,
+# c’est-à-dire à la probabilité pour un individu actif d’être au chômage
+# plutôt qu’en emploi. La variable dépendante est donc une indicatrice
+# de chômage, prenant la valeur 1 si l’individu est chômeur et 0 s’il
+# est actif occupé.
+
+# Bien que la variable expliquée soit binaire, on estime dans un premier
+# temps un modèle de probabilité linéaire (LPM). Dans ce cadre,
+# l’espérance conditionnelle de la variable dépendante correspond à
+# la probabilité d’être au chômage conditionnellement aux variables
+# explicatives. Les coefficients peuvent donc être interprétés
+# directement comme des variations de probabilité.
+
+# Les données ayant une structure de panel (les individus sont observés
+# sur 6 trimestres), le modèle estimé s’écrit :
+
+# Y_it = X_it * beta + alpha_i + u_it
+
+# où :
+# Y_it  : indicatrice de chômage pour l’individu i au trimestre t
+# X_it  : ensemble des variables explicatives (origine, âge, sexe,
+#         éducation, localisation, etc.)
+# alpha_i : hétérogénéité individuelle inobservée
+# u_it : terme d’erreur idiosyncratique
+
+# Dans cette question, on suppose que les effets individuels non observés
+# sont exogènes, c’est-à-dire non corrélés avec les variables explicatives.
+# Cette hypothèse correspond au cadre des modèles à effets aléatoires
+# (random effects).
+
+# L’estimation permet d’évaluer l’effet de la variable origine sur la
+# probabilité d’être au chômage toutes choses égales par ailleurs,
+# en contrôlant pour les caractéristiques individuelles et géographiques.
+
+# Les coefficients associés aux différentes modalités de la variable
+# origine mesurent l’écart de probabilité de chômage par rapport au
+# groupe de référence (les individus d’origine française).
+
+# Par exemple, un coefficient estimé de 0.05 pour une catégorie
+# d’origine signifie que les individus appartenant à ce groupe ont
+# environ 5 points de pourcentage de probabilité supplémentaire
+# d’être au chômage, toutes choses égales par ailleurs.
+
+# À l’inverse, un coefficient négatif indiquerait une probabilité
+# plus faible d’être au chômage relativement au groupe de référence.
+
+# L’analyse des résultats permet ainsi d’identifier l’existence
+# éventuelle d’inégalités d’accès à l’emploi selon l’origine,
+# après prise en compte des autres déterminants observables du
+# statut sur le marché du travail.
+# Installer le package si besoin
+install.packages("plm")
+
+library(plm)
+
+# On garde uniquement les individus actifs (occupés ou chômeurs)
+df_panel <- df %>%
+  filter(actif == 1)
+
+# Création de la variable binaire chômage
+df_panel <- df_panel %>%
+  mutate(
+    chomage = ifelse(acteu == 0, 1, 0),
+    age2 = age^2
+  )
+
+# Transformation en données de panel
+pdata <- pdata.frame(df_panel, index = c("id", "t"))
+
+# Modèle de probabilité linéaire avec effets aléatoires
+m_panel_RE <- plm(
+  chomage ~ origine + age + age2 + homme + region + tuu_r + education,
+  data = pdata,
+  model = "random"
+)
+
+# Résumé des résultats
+summary(m_panel_RE)
+library(lmtest)
+library(sandwich)
+
+coeftest(
+  m_panel_RE,
+  vcov = vcovHC(m_panel_RE, type = "HC1")
+)
