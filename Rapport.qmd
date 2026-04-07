@@ -69,7 +69,7 @@ Le code suivant permet de lire le fichier `.dta` et de vérifier ses dimensions 
 ```{r, echo=TRUE}
 df <- read_dta("DM_Subject_2_Data.dta")
 dim(df)  
-
+df$salhoraire = df$salmensuel / (df$heuretra * 4.33)
 ```
 
 ### 2) Statistiques descriptives
@@ -377,3 +377,43 @@ Cependant, le passage au panel "empilé" ne résout pas l'**endogénéité**. En
 #### **c) On ne suppose plus l'exogénéité stricte. Peut-on étudier l'effet de la variable Origine ?**
 
 Si l'on autorise les effets individuels à être corrélés avec les régresseurs, alors deux méthodes s'offrent à nous: *le Within et le First-Difference*; ces méthodes visant à supprimer les effets fixes. L'origine étant un effet fixe, il est impossible dans ce cadre d'étudier l'effet de la variable "origine" sur le salaire.
+
+# II. Marge Extensive
+
+On s’intéresse dans cette partie aux individus actifs (occupés ou chô
+meurs) avec comme variable dépendante l’indicatrice d’être au chômage. Le statut sur le marché du travail ( actif occupé, actif chômeur, inactif) est disponible chaque trimestre (données de panel avec T=6).
+
+### Question 4 – Modèle de probabilité Linéaire
+
+#### **a) Modèle avec exogénéité des résidus et effets fixes**
+
+```{r}
+library(plm)
+
+# 1. Préparation : on garde les actifs et on crée la dummy chômage
+df_panel <- df %>%
+  filter(acteu %in% c(1, 2)) %>% # 1: Occupé, 2: Chômeur 
+  mutate(chomage = if_else(acteu == 2, 1, 0),
+         age2 = age^2)
+
+# 2. Estimation du Modèle de Probabilité Linéaire
+# On garde la même spécification (X) que pour les salaires
+m4a <- plm(
+  chomage ~ origine + age + age2 + homme + region + tuu_r + education,
+  data = df_panel,
+  model = "pooling",
+  index = c("id_individu", "t")
+)
+
+# Résultats avec écarts-types robustes (clusterisés par individu)
+summary(m4a, vcov = vcovHC(m4a, type = "HC2", cluster = "group"))
+```
+
+Le résultat le plus frappant concerne **les maghrebins**, qui présente une pénalité massive : à caractéristiques identiques, ces individus ont une probabilité d'être au chômage supérieure de **10,5 points de pourcentage** ($p < 0,001$) par rapport aux français. Pour **les africains**, l'effet est de **5,6 points de pourcentage** supplémentaires. Bien que ce dernier ne soit significatif qu'au seuil de **10 %** ($p = 0,061$), il confirme la tendance observée sur la marge intensive : certaines origines subissent un désavantage non seulement sur le niveau de salaire, mais aussi sur l'accès même à l'emploi.
+
+L'éducation joue un rôle protecteur majeur contre le chômage. Par rapport au diplôme le plus élevé, le risque de chômage augmente systématiquement à mesure que le niveau d'études baisse, atteignant un surplus de **9,9 points de pourcentage** pour ceux n'ayant aucun diplôme ou un CAP ($p < 0,001$).
+Par ailleurs, le profil de l'âge est **convexe** : la probabilité de chômage diminue avec l'expérience ($\beta_{age} = -0,0088$), mais ce gain de stabilité s'atténue avec le temps ($\beta_{age^2} > 0$), suggérant un retour progressif du risque en fin de carrière. Enfin, les **hommes** ont en moyenne une probabilité plus faible (de **1,45 point de pourcentage)** d'être au chômage par rapport aux femmes, toutes choses égales par ailleurs.
+
+#### **b) Problème si on autorise la corrélation entre effets fixes et regresseurs**
+
+Si on autorise de la corrélation entre effets fixes et régresseurs, alors pour estimer un quelconque effet il faut éliminer les effets fixes (soit par *Within* ou *First diff*). Or, l'origine est de fait un effet fixe; donc dans ce contexte il est impossible d'étudier l'effet de la variable "origine".
