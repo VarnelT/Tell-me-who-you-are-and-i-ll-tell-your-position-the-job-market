@@ -264,9 +264,9 @@ regression(logsalhoraire)
 regression(salhoraire)
 ```
 
-Toutes choses égales par ailleurs, le modèle 1 prédit qu’un individu originaire d'Afrique gagne en moyenne **8,40 \$/h de moins** qu’un Français (soit une pénalité de **17,8 %** selon la spécification en log). Ce résultat est statistiquement significatif au seuil de **1 %**. L'ajout des variables de contrôle (âge, sexe et zone géographique) affine l'estimation, mais le signe, l'ampleur et la significativité de l'effet demeurent **robustes**.
+Toutes choses égales par ailleurs, le modèle 1 prédit qu’un individu originaire d'Afrique gagne en moyenne **1,94 \$/h de moins** qu’un Français (soit une pénalité de **17,8 %** selon la spécification en log). Ce résultat est statistiquement significatif au seuil de **1 %**. L'ajout des variables de contrôle (âge, sexe et zone géographique) affine l'estimation, mais le signe, l'ampleur et la significativité de l'effet demeurent **robustes**.
 
-En contrôlant en plus par l'**éducation** (modèle 4), l'écart se réduit légèrement mais reste massif : un individu originaire d'Afrique gagne désormais, toutes choses égales par ailleurs, **7,71 \$/h de moins** qu'un Français (soit **15 %** en moins dans le modèle en log). La persistance de cet effet, même à diplôme identique, suggère qu'une part prépondérante de l'inégalité salariale est directe et ne s'explique pas uniquement par des différences de capital humain. L’ajout de **éducation** provoque en plus une hausse substantielle du $R^2$ (passant de **8,3%** à **25,1%**). Cette progression démontre que le capital humain est le principal facteur explicatif de la variance des salaires dans notre échantillon.
+En contrôlant en plus par l'**éducation** (modèle 4), l'écart se réduit légèrement mais reste massif : un individu originaire d'Afrique gagne désormais, toutes choses égales par ailleurs, **1,78 \$/h de moins** qu'un Français (soit **15 %** en moins dans le modèle en log). La persistance de cet effet, même à diplôme identique, suggère qu'une part prépondérante de l'inégalité salariale est directe et ne s'explique pas uniquement par des différences de capital humain. L’ajout de **éducation** provoque en plus une hausse substantielle du $R^2$ (passant de **8,3%** à **25,1%**). Cette progression démontre que le capital humain est le principal facteur explicatif de la variance des salaires dans notre échantillon.
 
 Enfin, le modèle 5 intègre la CSP et le type de contrat. L’effet de l’origine devient beaucoup plus fragile. Le coefficient n’est plus significatif dans le modèle en niveau et ne l’est qu'au seuil de **10 %** dans le modèle en log. Ce résultat suggère qu’à CSP et type de contrat identiques, l’écart de salaire horaire tend à s’estomper statistiquement. En d'autres termes, l’essentiel du désavantage lié à l’origine constaté dans les modèles précédents semble transiter par une **ségrégation professionnelle** (accès plus difficile aux postes qualifiés et aux contrats stables) plutôt que par une inégalité de rémunération directe au sein d’un même poste.
 
@@ -415,3 +415,86 @@ L'éducation joue un rôle protecteur majeur contre le chômage. Par rapport au 
 #### **b) Problème si on autorise la corrélation entre effets fixes et regresseurs**
 
 Si on autorise de la corrélation entre effets fixes et régresseurs, alors pour estimer un quelconque effet il faut éliminer les effets fixes (soit par *Within* ou *First diff*). Or, l'origine est de fait un effet fixe; donc dans ce contexte il est impossible d'étudier l'effet de la variable "origine".
+
+### Question 5 – Modèle dynamique et dépendance d'état
+
+#### **a) Crédibilité de l'exogénéité stricte et faible**
+
+Pour capturer la dépendance d’état, nous introduisons le statut passé comme variable explicative. Le modèle s'écrit :
+
+\$\$y\_{it} = \\rho y\_{i,t-1} + X\_{it}\\beta + \\alpha_i + \\epsilon\_{it}\$\$
+
+Où $y_{it}$ est l'indicatrice de chômage, $\alpha_i$ l'hétérogénéité individuelle inobservée et $\epsilon_{it}$ le choc idiosyncratique.
+
+L'exogénéité stricte suppose que $E[\epsilon_{it} | y_{i,1}, \dots, y_{i,T}] = 0$. Or, par construction, le statut courant $y_{it}$ est corrélé au choc contemporain $\epsilon_{it}$ :
+
+\$\$E\[y\_{it} \\epsilon\_{it}\] = E\[(\\rho y\_{i,t-1} + X\_{it}\\beta + \\alpha_i + \\epsilon\_{it}) \\epsilon\_{it}\] = E\[\\epsilon\_{it}\^2\] = \\sigma\_\\epsilon\^2 \> 0\$\$
+
+Puisque le régresseur à la période $(t+1)$ est $y_{it}$, il est de fait corrélé au choc passé $\epsilon_{it}$. Cette corrélation entre un régresseur et les erreurs passées invalide l'hypothèse d'exogénéité stricte.
+
+De façon plus intuitive, l'exogénéité stricte n'est pas crédible ici car un choc comme le Covid en 2020 ($\epsilon_t$) met au chômage immédiatement ($y_{t}$). Ce statut devient mécaniquement le "passé" en 2021 ($y_{t+1}$), servant alors de régresseur pour cette période. Comme l'erreur de 2020 est corrélée au régresseur de 2021, la condition d'indépendance totale sur toutes les périodes est violée par construction.
+
+L'exogénéité faible en revanche est bien plus crédible : elle suppose simplement que le choc Covid de 2020 n'a pas pu influencer le statut d'emploi en 2019, 2018,etc
+
+#### **b) Estimation du modèle et interprétation**
+
+Dans le cadre d'un modèle dynamique avec exogénéité faible, les estimateurs First diff et Within sont biaisés vers le bas. Par conséquent, on va recourir à une regression instrumentée en considérant comme instruments $y_{i,t-1}$ puis $y_{i,t-1}-y_{i,t-2}$.
+
+Les résultats de la régression figurent ci-dessous:
+
+```{r}
+library(tidyverse)
+library(estimatr) # Pour iv_robust et le clustering
+
+df_ah <- df_panel %>%
+  arrange(id_individu, t) %>%
+  group_by(id_individu) %>%
+  mutate(
+    # Variables pour l'équation en FD
+    d.chomage = chomage - dplyr::lag(chomage),            # Delta y_it
+    ld.chomage = dplyr::lag(chomage) - dplyr::lag(chomage, 2), # Delta y_it-1
+    
+    # Instruments (Anderson-Hsiao)
+    instr_level = dplyr::lag(chomage, 2),                 # y_it-2
+    instr_diff = dplyr::lag(chomage, 2) - dplyr::lag(chomage, 3),# Delta y_it-2
+    
+    # Différences pour les contrôles (X)
+    d.age = age - dplyr::lag(age),
+    d.homme = homme - dplyr::lag(homme) 
+  ) %>%
+  filter(!is.na(ld.chomage)) # On nettoie les NAs créés par les lags
+```
+
+```{r}
+# Regression avec y_it-2 comme instrument
+fit_ah_level <- iv_robust(
+  d.chomage ~ ld.chomage + d.age | instr_level + d.age,
+  data = df_ah,
+  clusters = id_individu,
+  se_type = "CR2",
+  diagnostics = TRUE
+)
+
+summary(fit_ah_level)
+```
+
+Les diagnostics de la régression 2SLS confirment la validité de notre stratégie d'identification. La force de l'instrument (F-stat = 418) garantit une estimation précise, tandis que le test de Wu-Hausman confirme que la dépendance d'état ne pouvait être estimée sans corriger l'endogénéité du statut passé.
+
+Ainsi, toutes choses égales par ailleurs, le fait d'avoir été au chômage au trimestre précédent augmente la probabilité d'être au chômage ce trimestre de **36,4 points de pourcentage.**
+
+```{r}
+# Instrumentation par la différence Delta y_{i,t-2}
+fit_ah_diff <- iv_robust(
+  d.chomage ~ ld.chomage + d.age | instr_diff + d.age,
+  data = df_ah %>% filter(!is.na(instr_diff)),
+  clusters = id_individu,
+  se_type = "CR2",
+  diagnostics = TRUE
+)
+
+summary(fit_ah_diff)
+```
+
+L'estimation du modèle dynamique confirme l'existence d'une "trappe à chômage" robuste en neutralisant l'hétérogénéité individuelle inobservée et en corrigeant l'endogénéité du statut passé par l'instrumentation. Le coefficient de dépendance d’état ($\rho$), compris entre **0,20** et **0,36** selon la spécification de l'instrument (différence ou niveau), demeure hautement significatif, validant l'hypothèse d'un ***effet de cicatrice*** pur sur le marché du travail. La pertinence de cette stratégie est corroborée par des statistiques F de première étape massives (allant de **195** à **418**) et un test de Wu-Hausman rejetant sans équivoque l'exogénéité du régresseur retardé.
+
+En somme, ces résultats démontrent que le passage par le chômage réduit intrinsèquement les chances de retour à l'emploi futur, et ce, indépendamment des caractéristiques fixes des individus comme le genre, l'origine ou le talent inobservé.
