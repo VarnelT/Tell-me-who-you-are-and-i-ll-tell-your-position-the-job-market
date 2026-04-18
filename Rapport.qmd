@@ -24,6 +24,7 @@ install.packages("haven")
 install.packages("estimatr")
 install.packages("tidyverse")
 install.packages("fastDummies")
+installed.packages("margins")
 install.packages("corrplot")
 install.packages("rstatix")
 install.packages("modelsummary")
@@ -38,6 +39,7 @@ library(tidyverse)
 library(fastDummies)
 library(modelsummary)
 library(corrplot)
+library(margins)
 ```
 
 # I. Présentation du projet
@@ -436,7 +438,7 @@ De façon plus intuitive, l'exogénéité stricte n'est pas crédible ici car un
 
 L'exogénéité faible en revanche est bien plus crédible : elle suppose simplement que le choc Covid de 2020 n'a pas pu influencer le statut d'emploi en 2019, 2018,etc
 
-#### **b) Estimation du modèle et interprétation**
+#### **b,c) Estimation du modèle et interprétation**
 
 Dans le cadre d'un modèle dynamique avec exogénéité faible, les estimateurs First diff et Within sont biaisés vers le bas. Par conséquent, on va recourir à une regression instrumentée en considérant comme instruments $y_{i,t-1}$ puis $y_{i,t-1}-y_{i,t-2}$.
 
@@ -498,3 +500,56 @@ summary(fit_ah_diff)
 L'estimation du modèle dynamique confirme l'existence d'une "trappe à chômage" robuste en neutralisant l'hétérogénéité individuelle inobservée et en corrigeant l'endogénéité du statut passé par l'instrumentation. Le coefficient de dépendance d’état ($\rho$), compris entre **0,20** et **0,36** selon la spécification de l'instrument (différence ou niveau), demeure hautement significatif, validant l'hypothèse d'un ***effet de cicatrice*** pur sur le marché du travail. La pertinence de cette stratégie est corroborée par des statistiques F de première étape massives (allant de **195** à **418**) et un test de Wu-Hausman rejetant sans équivoque l'exogénéité du régresseur retardé.
 
 En somme, ces résultats démontrent que le passage par le chômage réduit intrinsèquement les chances de retour à l'emploi futur, et ce, indépendamment des caractéristiques fixes des individus comme le genre, l'origine ou le talent inobservé.
+
+### Question 6 – Modèle probit ou logit
+
+#### **a) Within et FD pour supprimer les effets fixes**
+
+Les méthodes **Within** et **First-Difference** sont inapplicables aux modèles Probit ou Logit car elles reposent sur des transformations linéaires (centrage ou soustraction) qui ne permettent pas d'isoler l'effet fixe $\alpha_i$ dans un cadre non linéaire.
+
+Dans ces modèles, la probabilité de succès est définie par $P(y_{it} = 1 | X_{it}, \alpha_i) = F(X_{it}\beta + \alpha_i)$, où $F$ est une fonction de répartition non linéaire ( la loi normale $\Phi$ ou la loi logistique). En raison de cette non-linéarité, l'effet fixe n'est pas additif et ne peut être éliminé par une simple différence : $F(X_{it}\beta + \alpha_i) - F(X_{i,t-1}\beta + \alpha_i) \neq F((X_{it} - X_{i,t-1})\beta)$.
+
+Tenter d'estimer directement chaque $\alpha_i$ comme un paramètre supplémentaire (approche par variables muettes) conduirait au "problème des paramètres incidents", où l'imprécision sur l'estimation des effets individuels avec un $T$ court se propage aux coefficients $\beta$, les rendant biaisés et non-consistants.
+
+#### **b) Estimation des modèles**
+
+```{r}
+# On filtre le dernier trimestre
+df_last <- df_panel %>% filter(t == 6)
+
+# Estimation Probit
+mod_probit <- glm(chomage ~ origine + age + age2 + homme + education + region+ tuu_r, 
+                  data = df_last, family = binomial(link = "probit"))
+
+# Estimation Logit
+mod_logit <- glm(chomage ~ origine + age + age2 + homme + education + region + tuu_r, 
+                 data = df_last, family = binomial(link = "logit"))
+
+# Calcul des effets marginaux moyens (AME)
+ame_probit <- summary(margins(mod_probit))
+ame_logit <- summary(margins(mod_logit))
+```
+
+##### Probit
+
+```{r}
+summary(mod_probit)
+```
+
+##### Logit
+
+```{r}
+summary(mod_logit)
+```
+
+Effets marginaux de l'origine
+
+```{r}
+ame_logit
+```
+
+```{r}
+ame_probit
+```
+
+L'estimation des modèles Probit et Logit met en évidence une similarité des effets marginaux moyens, confirmant que les conclusions de l’étude sont robustes à la spécification de la loi utilisée. On observe un désavantage massif identifié pour les individus d'Europe de l'Est et du Maghreb, dont la probabilité d'être au chômage atteint près de **9 points de pourcentage** par rapport aux français. Pour les africains, bien que l'effet moyen estimé soit positif (environ **+3,7%**), il demeure non significatif au seuil de $5\,\%$ ($p \approx 0,19$ dans les deux modèles) ; Cette stabilité globale entre les deux approches renforce le diagnostic d'une barrière à l'emploi sélective, tout en soulignant que les difficultés structurelles ne frappent pas toutes les origines de la même manière.
