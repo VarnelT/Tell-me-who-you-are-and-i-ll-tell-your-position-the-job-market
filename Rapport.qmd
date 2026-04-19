@@ -201,7 +201,7 @@ Par ailleurs, il est tout à fait possible que l'éducation soit un canal par le
 
 Le DAG (Directed Acyclic Graph) suivant résume notre schéma de modélisation:
 
-![](images/clipboard-2917733682.png)
+![](images/clipboard-3803197578.png)
 
 #### **b) Interprétation**
 
@@ -509,7 +509,7 @@ Les méthodes **Within** et **First-Difference** sont inapplicables aux modèles
 
 Dans ces modèles, la probabilité de succès est définie par $P(y_{it} = 1 | X_{it}, \alpha_i) = F(X_{it}\beta + \alpha_i)$, où $F$ est une fonction de répartition non linéaire ( la loi normale $\Phi$ ou la loi logistique). En raison de cette non-linéarité, l'effet fixe n'est pas additif et ne peut être éliminé par une simple différence : $F(X_{it}\beta + \alpha_i) - F(X_{i,t-1}\beta + \alpha_i) \neq F((X_{it} - X_{i,t-1})\beta)$.
 
-Tenter d'estimer directement chaque $\alpha_i$ comme un paramètre supplémentaire (approche par variables muettes) conduirait au "problème des paramètres incidents", où l'imprécision sur l'estimation des effets individuels avec un $T$ court se propage aux coefficients $\beta$, les rendant biaisés et non-consistants.
+De plus, tenter d'estimer directement chaque $\alpha_i$ comme un paramètre supplémentaire conduirait au problème des paramètres incidents, où l'imprécision sur l'estimation des effets individuels avec un $T$ court se propage aux coefficients $\beta$, les rendant biaisés et non-consistants.
 
 #### **b) Estimation des modèles**
 
@@ -552,4 +552,54 @@ ame_logit
 ame_probit
 ```
 
-L'estimation des modèles Probit et Logit met en évidence une similarité des effets marginaux moyens, confirmant que les conclusions de l’étude sont robustes à la spécification de la loi utilisée. On observe un désavantage massif identifié pour les individus d'Europe de l'Est et du Maghreb, dont la probabilité d'être au chômage atteint près de **9 points de pourcentage** par rapport aux français. Pour les africains, bien que l'effet moyen estimé soit positif (environ **+3,7%**), il demeure non significatif au seuil de $5\,\%$ ($p \approx 0,19$ dans les deux modèles) ; Cette stabilité globale entre les deux approches renforce le diagnostic d'une barrière à l'emploi sélective, tout en soulignant que les difficultés structurelles ne frappent pas toutes les origines de la même manière.
+L'estimation des modèles Probit et Logit révèle une forte similarité des effets marginaux moyens, confirmant que les conclusions de l’étude sont robustes à la spécification de la loi utilisée. On observe un désavantage marqué pour les individus d'Europe de l'Est et du Maghreb, dont la probabilité de chômage est supérieure de près de **9 points de pourcentage** à celle des Français. Pour les Africains, bien que l'effet moyen estimé soit positif (environ **+3,7 %**), il demeure non significatif au seuil de **5 %** ($p \approx 0,20$ dans les deux modèles). Cette convergence entre les deux approches renforce le diagnostic d'une barrière à l'emploi sélective.
+
+#### **c) Méthode de Rivers-Vuong pour corriger l'endogénéité**
+
+```{r}
+# Méthode de rivers-vuong
+# Création de la dummy diplôme supérieur et de l'instrument
+df_last <- df_last %>%
+  mutate(diplome_sup = if_else(education == "1", 1, 0)) %>%
+  mutate(csp_mere_high = case_when(
+    # On liste les codes de la "classe instruite"
+    csp_mere %in% c("13", "23", "31", "33", "34", "35", "37", "38", 
+                    "42", "43", "44", "45", "46", "47", "48", "74", "75") ~ 1,
+    # Tout le reste est mis à 0 (classe populaire/prolétaire)
+    TRUE ~ 0
+  ))
+
+# 1ère étape:  Régression de l'éducation sur les exogènes + Instrument
+reg_educ <- lm(diplome_sup ~ origine + age + age2 + homme + region + tuu_r + csp_mere_high, data = df_last)
+
+summary(reg_educ)
+```
+
+L’instrument choisi est une variable binaire, **`csp_mere_high`**, qui indique si la mère appartient aux classes instruites ou supérieures (cadres, professions intellectuelles et intermédiaires).
+
+-   **Pertinence :** L'instrument est statistiquement très significatif ($p < 2.10^{-16}$). Avoir une mère issue de la classe instruite augmente la probabilité d'obtenir un diplôme du supérieur de **30,4 points de pourcentage** toutes choses égales par ailleurs.
+
+La 1ère étape étant donc validée, on peut passer à la seconde étape pour estimer le modèle probit.
+
+```{r}
+# Récupération des résidus
+df_last$residus_educ <- residuals(reg_educ)
+
+# 3. Étape 2 : Probit augmenté (Rivers-Vuong)
+mod_rv <- glm(chomage ~ diplome_sup + origine + age + age2 + homme + region + tuu_r + residus_educ,
+              family = binomial(link = "probit"), 
+              data = df_last)
+
+summary(mod_rv)
+
+```
+
+La mise en œuvre de la méthode de Rivers-Vuong confirme l'exogénéité du diplôme du supérieur dans notre modèle ($p = 0,297$ pour le coefficient du résidu). L'enseignement principal de cette estimation réside dans la robustesse de la pénalité liée à l'origine : même en instrumentant le capital humain par la catégorie sociopro de la mère, les individus originaires **du Maghreb (06), d'Europe de l'Est (05) et d'Afrique (07)** subissent un sur-risque de chômage significatif comparé aux Français.
+
+```{r}
+# Calcul des effets marginaux
+ame_rv <- summary(margins(mod_rv))
+print(ame_rv)
+```
+
+Toutes choses égales par ailleurs, l'analyse des effets marginaux révèle que l'origine maghrébine augmente la probabilité d'être au chômage de **10,78 points de pourcentage** par rapport aux Français. Cette difficulté d'insertion demeure massive pour les individus originaires d'Europe de l'Est, avec un écart de **7,97 points**, tandis qu'elle s'élève à **5,69 points** pour les personnes d'origine africaine.
