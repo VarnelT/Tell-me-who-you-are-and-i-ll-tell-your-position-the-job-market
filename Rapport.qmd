@@ -594,12 +594,19 @@ summary(mod_rv)
 
 ```
 
-La mise en œuvre de la méthode de Rivers-Vuong confirme l'exogénéité du diplôme du supérieur dans notre modèle ($p = 0,297$ pour le coefficient du résidu). L'enseignement principal de cette estimation réside dans la robustesse de la pénalité liée à l'origine : même en instrumentant le capital humain par la catégorie sociopro de la mère, les individus originaires **du Maghreb (06), d'Europe de l'Est (05) et d'Afrique (07)** subissent un sur-risque de chômage significatif comparé aux Français.
+La mise en œuvre de la méthode de Rivers-Vuong ne met pas en évidence d’endogénéité du diplôme du supérieur dans notre modèle : le coefficient du résidu n’est pas significatif ($p = 0{,}297$), ce qui signifie que l’on ne rejette pas l’hypothèse d’exogénéité. Dans ce cas, l’estimation probit standard apparaît appropriée et la correction n’apporte pas de modification substantielle des résultats.
 
+L’enseignement principal de cette estimation réside dans la robustesse de l’effet de l’origine : même en instrumentant le capital humain par la catégorie socio-professionnelle de la mère, les individus originaires du Maghreb (06), d’Europe de l’Est (05) et d’Afrique (07) présentent une probabilité de chômage significativement plus élevée que les Français, toutes choses égales par ailleurs.
+
+Ces résultats doivent toutefois être interprétés avec prudence, dans la mesure où la validité de l’instrument repose sur une hypothèse forte d’exclusion (absence d’effet direct de la CSP maternelle sur l’accès à l’emploi), qui peut être discutée.
 ```{r}
 # Calcul des effets marginaux
 ame_rv <- summary(margins(mod_rv))
 print(ame_rv)
 ```
 
-Toutes choses égales par ailleurs, l'analyse des effets marginaux révèle que l'origine maghrébine augmente la probabilité d'être au chômage de **10,78 points de pourcentage** par rapport aux Français. Cette difficulté d'insertion demeure massive pour les individus originaires d'Europe de l'Est, avec un écart de **7,97 points**, tandis qu'elle s'élève à **5,69 points** pour les personnes d'origine africaine.
+Toutes choses égales par ailleurs, l’analyse des effets marginaux indique que l’origine maghrébine est associée à une probabilité de chômage plus élevée de 10,78 points de pourcentage par rapport à la catégorie de référence (origine française).
+
+Cet écart reste important pour les individus originaires d’Europe de l’Est, avec une augmentation de 7,97 points de pourcentage, tandis qu’il s’élève à 5,69 points pour les personnes d’origine africaine.
+
+Ces résultats suggèrent l’existence d’inégalités d’accès à l’emploi selon l’origine, même en contrôlant pour les caractéristiques individuelles observables.
