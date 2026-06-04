@@ -18,7 +18,7 @@ library(modelsummary)
 library(corrplot)
 
 # Importation de la base de données
-df <- read_dta("DM_Subject_2_Data.dta")
+df <- read_dta("data/DM_Subject_2_Data.dta")
 dim(df)
 
 #--------------------QUESTION 1------------------------------------------------

@@ -69,7 +69,7 @@ Nous commençons par importer la base de données fournie pour le projet.
 Le code suivant permet de lire le fichier `.dta` et de vérifier ses dimensions (nombre de lignes et de colonnes) :
 
 ```{r, echo=TRUE}
-df <- read_dta("DM_Subject_2_Data.dta")
+df <- read_dta("data/DM_Subject_2_Data.dta")
 dim(df)  
 df$salhoraire = df$salmensuel / (df$heuretra * 4.33)
 ```
