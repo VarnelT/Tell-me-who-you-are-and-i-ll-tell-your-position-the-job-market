@@ -73,7 +73,9 @@ quarto render Rapport.qmd
 # Or run the analysis interactively inside RStudio by opening Rapport.qmd
 ```
 
-The dataset `DM_Subject_2_Data.dta` is included in the repository. All results in the report are fully reproducible from this single Stata-format data file.
+The dataset `data/DM_Subject_2_Data.dta` is included in the repository. All results in the report are fully reproducible from this single Stata-format data file.
+
+Alternatively, the script `src/Work.R` contains standalone R code for running individual regressions outside of the Quarto environment.
 
 ## References
 
